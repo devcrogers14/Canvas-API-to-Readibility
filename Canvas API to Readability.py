@@ -4,54 +4,67 @@ import os
 from urllib.request import Request, urlopen
 
 # Setup details for Canvas
-canvas_url = "https://iit.instructure.com/api/v1"
+canvasUrl = "https://iit.instructure.com/api/v1"
 apiKey = os.getenv("CANVAS_API_KEY")
 
-# Get today's date in the format Canvas uses (Year-Month-Day)
-today = datetime.datetime.now().strftime("%Y-%m-%d")
+# Get the current week from Monday through Sunday.
+currentDate = datetime.date.today()
+weekStart = currentDate - datetime.timedelta(days=currentDate.weekday())
+weekEnd = weekStart + datetime.timedelta(days=6)
 
+
+class Assignment:
+
+    def __init__(self, name, dueDate, submitted, score=None):
+        self.name = name
+        self.dueDate = dueDate
+        self.submitted = submitted
+        self.score = score
 
 class Course:
 
-    def __init__(self, course_id, course_name, course_code):
-        self.course_id = course_id
-        self.course_name = course_name
-        self.course_code = course_code
+    def __init__(self, courseId, courseName, courseCode, grade=None):
+        self.courseId = courseId
+        self.courseName = courseName
+        self.courseCode = courseCode
+        self.grade = grade
         self.assignments = []  # Starts empty for every new course
 
     def courseInfo(self):
-        return f"Course ID: {self.course_id} | Name: {self.course_name} ({self.course_code})"
+        grade_info = f" | Grade: {self.grade}" if self.grade is not None else ""
+        return f"Course ID: {self.courseId} | Name: {self.courseName} ({self.courseCode}){grade_info}"
 
     @classmethod
     def getCourses(cls):
-        courses_endpoint = f"{canvas_url}/courses?include[]=course"
+        coursesEndpoint = f"{canvasUrl}/courses?include[]=course,total_scores&enrollment_state=active"
         headers = {"Authorization": f"Bearer {apiKey}"}
 
-        request = Request(courses_endpoint, headers=headers)
+        request = Request(coursesEndpoint, headers=headers)
         response = urlopen(request)
 
-        course_list = []
+        courseList = []
         if response.status == 200:
             data = json.loads(response.read().decode("utf-8"))
-            for course_data in data:
-                if course_data.get("workflow_state") == "available":
-                    new_course = cls(
-                        course_id=course_data.get("id"),
-                        course_name=course_data.get("name"),
-                        course_code=course_data.get("course_code"),
+            for courseData in data:
+                if courseData.get("workflow_state") == "available":
+                    newCourse = cls(
+                        courseId=courseData.get("id"),
+                        courseName=courseData.get("name"),
+                        courseCode=courseData.get("course_code"),
+                        grade=courseData.get("total_scores", {}).get("current_score")
                     )
-                    course_list.append(new_course)
+                    courseList.append(newCourse)
 
-        return course_list
+        return courseList
 
     def getAssignments(self):
         # Look up assignments using this specific course's ID
-        assignments_endpoint = (
-            f"{canvas_url}/courses/{self.course_id}/assignments"
+        assignmentsEndpoint = (
+            f"{canvasUrl}/courses/{self.courseId}/assignments?include[]=submission"
         )
         headers = {"Authorization": f"Bearer {apiKey}"}
 
-        request = Request(assignments_endpoint, headers=headers)
+        request = Request(assignmentsEndpoint, headers=headers)
         response = urlopen(request)
 
         self.assignments = []  # Clear out any old assignments
@@ -59,72 +72,88 @@ class Course:
         if response.status == 200: #Checks for a successful response
             data = json.loads(response.read().decode("utf-8"))
             for item in data:
-                due_date = item.get("due_at")
-                assignment_name = item.get("name")
+                dueDate = item.get("due_at")
+                assignmentName = item.get("name")
+                submission = item.get("submission") or {}
+                submitted = submission.get("submitted_at") is not None
+                score = submission.get("score")
 
-                # If it has a deadline and that deadline is in the future
-                if due_date and due_date > today:
+                if dueDate:
+                    dueDateValue = datetime.datetime.fromisoformat(
+                        dueDate.replace("Z", "+00:00")
+                    ).date()
+
+                # Include assignments due this week, whether submitted or not.
+                if dueDate and weekStart <= dueDateValue <= weekEnd:
                     self.assignments.append(
-                        {"name": assignment_name, "due_date": due_date}
+                        Assignment(
+                            name=assignmentName,
+                            dueDate=dueDate,
+                            submitted=submitted,
+                            score=score,
+                        )
                     )
         else:
-            print(f"Failed to retrieve assignments for {self.course_name}. Status code: {response.status}")
+            print(f"Failed to retrieve assignments for {self.courseName}. Status code: {response.status}")
 
         return self.assignments
 
     def printAssignments(self):
-        print(f"\nAssignments for {self.course_name}:")
+        print(f"\nAssignments for {self.courseName}:")
 
         # Check if the list has anything inside it
         if len(self.assignments) == 0:
-            print("  No upcoming assignments found.")
+            print("  No assignments due this week found.")
         else:
             for assignment in self.assignments:
                 print(
-                    f"  - {assignment['name']} (Due: {assignment['due_date']})"
+                    f"  - {assignment.name} (Due: {assignment.dueDate}) "
+                    f"[Submitted: {assignment.submitted}] "
+                    f"[Score: {assignment.score if assignment.score is not None else 'N/A'}]"
                 )
 
 
 def main():
-    all_courses = Course.getCourses()
+    allCourses = Course.getCourses()
 
     #handles all logic for nicely formatting user schedules and assignments
     print("--- Available Courses ---")
-    for course in all_courses:
+    for course in allCourses:
         print(course.courseInfo())
     print("\n" + "=" * 40)
 
 
-
-
     while True:
-        user_choice = input(
+        userChoice = input(
             "Enter a Course ID, press Enter for all, or type 'exit': "
         ).strip()
 
-        if user_choice.lower() == "exit":
+        if userChoice.lower() == "exit":
             print("Exiting program.")
             break
 
         # OPTION 1: User pressed Enter -> show every course
-        elif user_choice == "":
-            for course in all_courses:
+        elif userChoice == "":
+            for courseIndex, course in enumerate(allCourses):
                 course.getAssignments()
                 course.printAssignments()
 
+                if courseIndex < len(allCourses) - 1:
+                    input("Press Enter to continue to the next course...")
+
         # OPTION 2: User entered a specific course ID
         else:
-            found_course = False
+            foundCourse = False
 
             # Look through all our courses to find the matching one
-            for course in all_courses:
-                if str(course.course_id) == user_choice:
+            for course in allCourses:
+                if str(course.courseId) == userChoice:
                     course.getAssignments()
                     course.printAssignments()
-                    found_course = True
+                    foundCourse = True
 
-            if not found_course:
-                print(f"Could not find any course with ID: {user_choice}")
+            if not foundCourse:
+                print(f"Could not find any course with ID: {userChoice}")
                 continue
 
 
