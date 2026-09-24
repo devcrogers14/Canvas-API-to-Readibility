@@ -25,7 +25,7 @@ class Course:
 
     def __init__(self, courseId, courseName, courseCode, grade=None):
         self.courseId = courseId
-        self.courseName = courseName
+        self.courseName = courseName    
         self.courseCode = courseCode
         self.grade = grade
         self.assignments = []  # Starts empty for every new course
