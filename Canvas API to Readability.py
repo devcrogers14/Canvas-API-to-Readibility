@@ -7,7 +7,7 @@ from fastmcp import FastMCP
 # Setup details for Canvas
 canvasUrl = "https://iit.instructure.com/api/v1"
 apiKey = os.getenv("CANVAS_API_KEY")
-mcp = FastMCP(name = "Canvas Readability", description = "A tool to read Canvas assignments and grades", version = "1.0.0")
+mcp = FastMCP(name = "Canvas Readability", instructions = "A tool to read Canvas assignments and grades", version = "1.0.0")
 
 # Get the current week from Monday through Sunday.
 currentDate = datetime.date.today()
@@ -38,7 +38,6 @@ class Course:
         return f"Course ID: {self.courseId} | Name: {self.courseName} ({self.courseCode}){grade_info}"
 
     @classmethod
-    @mcp.tool
     def getCourses(cls):
         coursesEndpoint = f"{canvasUrl}/courses?include[]=course,total_scores&enrollment_state=active"
         headers = {"Authorization": f"Bearer {apiKey}"}
@@ -60,7 +59,6 @@ class Course:
                     courseList.append(newCourse)
 
         return courseList
-    @mcp.tool
     def getAssignments(self):
         # Look up assignments using this specific course's ID
         assignmentsEndpoint = (
@@ -117,6 +115,30 @@ class Course:
                 )
 
 
+# Lucas calls these tools with simple arguments; the classes organize data internally.
+@mcp.tool
+def get_courses() -> list[dict]:
+    """List available Canvas courses and their IDs."""
+    return [
+        {"course_id": c.courseId, "name": c.courseName,
+         "course_code": c.courseCode, "grade": c.grade}
+        for c in Course.getCourses()
+    ]
+
+
+@mcp.tool
+def get_assignments(course_id: int) -> list[dict]:
+    """Get assignments due this week for a course ID returned by get_courses."""
+    if course_id <= 0:
+        raise ValueError("Use a positive Canvas course ID.")
+    course = Course(course_id, "", "")
+    return [
+        {"name": a.name, "due_date": a.dueDate,
+         "submitted": a.submitted, "score": a.score}
+        for a in course.getAssignments()
+    ]
+
+
 def main():
     allCourses = Course.getCourses()
 
@@ -160,6 +182,10 @@ def main():
                 print(f"Could not find any course with ID: {userChoice}")
                 continue
 
-
+#Listen on this laptop at port 8000 for incoming requessts to the server via http. This is the default port for HTTP servers.
 if __name__ == "__main__":
-    mcp.run(main)
+    mcp.run(
+        transport= "http",
+        host = "127.0.0.1",
+        port = 8000
+    )

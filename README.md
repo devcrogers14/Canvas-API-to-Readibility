@@ -2,7 +2,7 @@
 
 This version exposes two read-only tools: `get_courses()` and `get_assignments(course_id)`.
 Assignments are filtered to the current Monday–Sunday week in America/Chicago.
-Set `CANVAS_TIMEZONE` to another IANA timezone name if needed.
+Set `CANVAS_TIMEZONE` to another timezone name if needed.
 
 ## Setup
 
@@ -33,9 +33,6 @@ Example for clients that accept an `mcpServers` configuration (adapt to Lucas's 
   }
 }
 ```
-
-The server uses local stdio transport. A client that only accepts a remote HTTP
-MCP URL needs a different deployment and authentication setup.
 
 ## Original interactive menu
 
