@@ -2,10 +2,12 @@ import datetime
 import json
 import os
 from urllib.request import Request, urlopen
+from fastmcp import FastMCP
 
 # Setup details for Canvas
 canvasUrl = "https://iit.instructure.com/api/v1"
 apiKey = os.getenv("CANVAS_API_KEY")
+mcp = FastMCP(name = "Canvas Readability", description = "A tool to read Canvas assignments and grades", version = "1.0.0")
 
 # Get the current week from Monday through Sunday.
 currentDate = datetime.date.today()
@@ -21,6 +23,7 @@ class Assignment:
         self.submitted = submitted
         self.score = score
 
+
 class Course:
 
     def __init__(self, courseId, courseName, courseCode, grade=None):
@@ -35,6 +38,7 @@ class Course:
         return f"Course ID: {self.courseId} | Name: {self.courseName} ({self.courseCode}){grade_info}"
 
     @classmethod
+    @mcp.tool
     def getCourses(cls):
         coursesEndpoint = f"{canvasUrl}/courses?include[]=course,total_scores&enrollment_state=active"
         headers = {"Authorization": f"Bearer {apiKey}"}
@@ -56,7 +60,7 @@ class Course:
                     courseList.append(newCourse)
 
         return courseList
-
+    @mcp.tool
     def getAssignments(self):
         # Look up assignments using this specific course's ID
         assignmentsEndpoint = (
@@ -158,4 +162,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    mcp.run(main)
