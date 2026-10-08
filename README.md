@@ -1,44 +1,49 @@
 # Canvas Readability MCP server
 
-This version exposes two read-only tools: `get_courses()` and `get_assignments(course_id)`.
-Assignments are filtered to the current Monday–Sunday week in America/Chicago.
-Set `CANVAS_TIMEZONE` to another timezone name if needed.
+Exposes two read-only tools: `get_courses()` and `get_assignments(course_id)`.
+Assignments are filtered to the current Monday–Sunday week. The script currently
+uses the laptop's date for the week and Canvas's UTC date for assignment due dates.
 
 ## Setup
 
-Use Python 3.10 or newer and install dependencies with that same interpreter:
+Use Python 3.10 or newer. Create a project environment if you do not have one:
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Configure Lucas's MCP client to launch Python with the absolute path to
-`Canvas API to Readability.py` as its argument. Supply `CANVAS_API_KEY` in the
-server process environment. Use the Python executable where you installed
-these dependencies. Do not add `--cli` to the MCP launch arguments.
+Copy `.env.example` to `.env` if `.env` does not exist. Put your Canvas key in it:
 
-Example for clients that accept an `mcpServers` configuration (adapt to Lucas's format):
-
-```json
-{
-  "mcpServers": {
-    "canvas": {
-      "command": "C:/path/to/python.exe",
-      "args": ["C:/path/to/Canvas API to Readability.py"],
-      "env": {
-        "CANVAS_API_KEY": "YOUR_CANVAS_TOKEN",
-        "CANVAS_TIMEZONE": "America/Chicago"
-      }
-    }
-  }
-}
+```dotenv
+CANVAS_API_KEY=your_actual_canvas_key
 ```
 
-## Original interactive menu
+The server automatically loads `.env` from the folder containing the Python script,
+even if you start it from a different folder. Existing process environment variables
+take priority. Save changes and restart the server to load new keys.
+The real `.env` is ignored by Git; `.env.example` contains no secrets and can be shared.
+
+## Run
+
+From this project folder:
 
 ```powershell
-python "Canvas API to Readability.py" --cli
+.\.venv\Scripts\python.exe "Canvas API to Readability.py"
 ```
 
-The menu is separate because MCP uses standard input/output for protocol messages.
-Grades are percentages when Canvas supplies them; unavailable grades remain null.
+The HTTP MCP endpoint is `http://127.0.0.1:8000/mcp`.
+Responses use JSON instead of SSE. HTTP requests do not retain MCP sessions
+(`json_response=True`, `stateless_http=True`).
+Press Ctrl+C in its terminal to stop it. This version runs HTTP, not a stdio server.
+It has no MCP client authentication yet; keep it local until authentication is added.
+
+## Adding more services
+
+Give each service its own variable in `.env`, for example `WEATHER_API_KEY`.
+Read it in Python with `os.getenv("WEATHER_API_KEY")` and use it in that service's
+API requests. You must also write and register the corresponding MCP tools;
+adding an API key alone does not add an integration.
+
+`python-dotenv` loads the file; `fastmcp` provides the MCP server. `tzdata` supplies
+timezone data on Windows, but the current script does not use it yet.

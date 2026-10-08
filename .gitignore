@@ -5,3 +5,7 @@
 # Ignore Python cache
 __pycache__/
 *.pyc
+# Keep local secrets and the Python environment out of Git
+.env.*
+!.env.example
+.venv/

@@ -1,13 +1,27 @@
 import datetime
 import json
 import os
+from pathlib import Path
 from urllib.request import Request, urlopen
+from dotenv import load_dotenv
 from fastmcp import FastMCP
+
+# Load keys from the .env beside this script, even when launched from another folder.
+# Existing environment variables take priority over values in the file.
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 # Setup details for Canvas
 canvasUrl = "https://iit.instructure.com/api/v1"
 apiKey = os.getenv("CANVAS_API_KEY")
 mcp = FastMCP(name = "Canvas Readability", instructions = "A tool to read Canvas assignments and grades", version = "1.0.0")
+
+
+def canvas_headers():
+    # Validate only when a Canvas tool is called, so other integrations can still run.
+    if not apiKey or not apiKey.strip():
+        raise ValueError("Add CANVAS_API_KEY to the .env beside this script, save it, and restart the server.")
+    return {"Authorization": f"Bearer {apiKey.strip()}"}
+
 
 # Get the current week from Monday through Sunday.
 currentDate = datetime.date.today()
@@ -40,7 +54,7 @@ class Course:
     @classmethod
     def getCourses(cls):
         coursesEndpoint = f"{canvasUrl}/courses?include[]=course,total_scores&enrollment_state=active"
-        headers = {"Authorization": f"Bearer {apiKey}"}
+        headers = canvas_headers()
 
         request = Request(coursesEndpoint, headers=headers)
         response = urlopen(request)
@@ -64,7 +78,7 @@ class Course:
         assignmentsEndpoint = (
             f"{canvasUrl}/courses/{self.courseId}/assignments?include[]=submission"
         )
-        headers = {"Authorization": f"Bearer {apiKey}"}
+        headers = canvas_headers()
 
         request = Request(assignmentsEndpoint, headers=headers)
         response = urlopen(request)
@@ -182,10 +196,12 @@ def main():
                 print(f"Could not find any course with ID: {userChoice}")
                 continue
 
-#Listen on this laptop at port 8000 for incoming requessts to the server via http. This is the default port for HTTP servers.
+# Listen locally on port 8000. Return JSON and handle each MCP request independently.
 if __name__ == "__main__":
     mcp.run(
         transport= "http",
         host = "127.0.0.1",
-        port = 8000
+        port = 8000,
+        json_response = True,
+        stateless_http = True,
     )
