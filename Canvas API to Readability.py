@@ -141,6 +141,18 @@ def get_courses() -> list[dict]:
 
 
 @mcp.tool
+def check_modules(course_id: int) -> list[dict]:
+    """List course modules and their items for a positive Canvas course ID."""
+    if course_id <= 0:
+        raise ValueError("Use a positive Canvas course ID.")
+
+    courseModulesEndpoint = f"{canvasUrl}/courses/{course_id}/modules?include[]=items"
+    canvasRequest = Request(courseModulesEndpoint, headers=canvas_headers())
+    with urlopen(canvasRequest) as canvasResponse:
+        return json.loads(canvasResponse.read().decode("utf-8"))
+
+
+@mcp.tool
 def get_assignments(course_id: int) -> list[dict]:
     """Get assignments due this week for a course ID returned by get_courses."""
     if course_id <= 0:

@@ -1,6 +1,7 @@
 # Canvas Readability MCP server
 
-Exposes two read-only tools: `get_courses()` and `get_assignments(course_id)`.
+Exposes three read-only tools: `get_courses()`, `get_assignments(course_id)`,
+and `check_modules(course_id)` (course modules and their items).
 Assignments are filtered to the current Monday–Sunday week. The script currently
 uses the laptop's date for the week and Canvas's UTC date for assignment due dates.
 
