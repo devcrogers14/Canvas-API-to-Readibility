@@ -1,3 +1,7 @@
 fastmcp>=2.0,<4.0
 tzdata>=2025.1
 python-dotenv>=1.0,<2.0
+
+# Windows HTTPS tunnel dependency (install separately; this is not a Python package):
+# cloudflared - creates the public HTTPS tunnel to the local MCP server.
+# Install: winget install --id Cloudflare.cloudflared --exact --source winget

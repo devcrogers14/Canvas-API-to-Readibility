@@ -1,10 +1,12 @@
 import datetime
 import json
 import os
+import secrets
 from pathlib import Path
 from urllib.request import Request, urlopen
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from fastmcp.server.auth import TokenVerifier, AccessToken
 
 # Load keys from the .env beside this script, even when launched from another folder.
 # Existing environment variables take priority over values in the file.
@@ -12,15 +14,49 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 # Setup details for Canvas
 canvasUrl = "https://iit.instructure.com/api/v1"
-apiKey = os.getenv("CANVAS_API_KEY")
-mcp = FastMCP(name = "Canvas Readability", instructions = "A tool to read Canvas assignments and grades", version = "1.0.0")
+canvasApiKey = os.getenv("CANVAS_API_KEY")
+
+# This is the separate secret that Lucas needs before he can use our server.
+serverAccessToken = os.getenv("MCP_SERVER_TOKEN", "").strip()
+
+# Stop here if the secret is missing or too short so we do not run an open server.
+if len(serverAccessToken) < 32:
+    raise ValueError("Add a randomly generated MCP_SERVER_TOKEN of at least 32 characters to .env, then restart the server.")
+
+
+class ServerTokenChecker(TokenVerifier):
+    # FastMCP calls this when someone sends a token with their request.
+    # token is the value they sent, and serverAccessToken is the secret we saved.
+    async def verify_token(self, token: str) -> AccessToken | None:
+        # Compare the two secrets without giving away which characters matched.
+        tokensMatch = secrets.compare_digest(
+            token.encode("utf-8"),
+            serverAccessToken.encode("utf-8"),
+        )
+
+        # Wrong token -> tell FastMCP to reject this request.
+        if not tokensMatch:
+            return None
+
+        # Correct token -> let this request use our MCP tools.
+        # lucas is just a label. Anyone who has this secret can use it.
+        return AccessToken(token=token, client_id="lucas", scopes=[])
+
+
+mcp = FastMCP(
+    name="Canvas Readability",
+    instructions="A tool to read Canvas assignments and grades",
+    version="1.0.0",
+    # This actually turns on the token check for incoming MCP requests.
+    auth=ServerTokenChecker(),
+)
 
 
 def canvas_headers():
     # Validate only when a Canvas tool is called, so other integrations can still run.
-    if not apiKey or not apiKey.strip():
+    if not canvasApiKey or not canvasApiKey.strip():
         raise ValueError("Add CANVAS_API_KEY to the .env beside this script, save it, and restart the server.")
-    return {"Authorization": f"Bearer {apiKey.strip()}"}
+    return {"Authorization": f"Bearer {canvasApiKey.strip()}"}
 
 
 # Get the current week from Monday through Sunday.
